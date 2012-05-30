@@ -359,25 +359,31 @@ class Mage_Core_Model_Email_Template extends Mage_Core_Model_Template
             $variables['this'] = $this;
         }
 
-        if (isset($variables['subscriber']) && ($variables['subscriber'] instanceof Mage_Newsletter_Model_Subscriber)) {
-            $processor->setStoreId($variables['subscriber']->getStoreId());
-        }
-
-        if (!isset($variables['logo_url'])) {
-            $variables['logo_url'] = $this->_getLogoUrl($processor->getStoreId());
-        }
-        if (!isset($variables['logo_alt'])) {
-            $variables['logo_alt'] = $this->_getLogoAlt($processor->getStoreId());
-        }
-
-        $processor->setIncludeProcessor(array($this, 'getInclude'))
-            ->setVariables($variables);
+        $processor->setIncludeProcessor(array($this, 'getInclude'));
 
         $this->_applyDesignConfig();
         $storeId = $this->getDesignConfig()->getStore();
         try {
-            $processedResult = $processor->setStoreId($storeId)
-                ->filter($this->getPreparedTemplateText());
+            $processor->setStoreId($storeId);
+            $transport = new Varien_Object(array(
+                'variables' => $variables,
+                'template_text' => $this->getPreparedTemplateText(),
+                'store_id' => $storeId
+            ));
+            // Use observer to modify variables and template processor settings
+            Mage::dispatchEvent('email_template_filter_before', array(
+                'processor' => $processor,
+                'transport' => $transport
+            ));
+            if (!isset($variables['logo_url'])) {
+                $variables['logo_url'] = $this->_getLogoUrl($transport->getStoreId());
+            }
+            if (!isset($variables['logo_alt'])) {
+                $variables['logo_alt'] = $this->_getLogoAlt($transport->getStoreId());
+            }
+
+            $processedResult = $processor->setVariables($transport->getVariables())
+                    ->filter($transport->getTemplateText());
         } catch (Exception $e) {
             $this->_cancelDesignConfig();
             throw $e;
@@ -496,6 +502,12 @@ class Mage_Core_Model_Email_Template extends Mage_Core_Model_Template
         $result = false;
         $this->_sendingException = null;
         try {
+            Mage::dispatchEvent('email_template_send_before', array(
+                'mailer' => $mail,
+                'variables' => new Varien_Object($variables),
+                'template' => $this,
+                'store_id' => $this->getDesignConfig()->getStore()
+            ));
             $mail->send();
             $result = true;
         } catch (Exception $e) {
