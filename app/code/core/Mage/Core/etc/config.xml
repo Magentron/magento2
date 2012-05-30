@@ -90,6 +90,9 @@
                 <render_inherited>0</render_inherited>
             </page_type>
         </dev>
+        <email>
+            <factory_helper>Mage_Core_Helper_Mail::getMailer</factory_helper>
+        </email>
     </global>
     <frontend>
         <routers>

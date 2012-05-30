@@ -73,6 +73,7 @@ class Mage_Core_Model_Email_Template extends Mage_Core_Model_Template
      * Configuration path for default email templates
      */
     const XML_PATH_TEMPLATE_EMAIL               = 'global/template/email';
+    const XML_PATH_MAIL_FACTORY                 = 'global/email/factory_helper';
     const XML_PATH_SENDING_SET_RETURN_PATH      = 'system/smtp/set_return_path';
     const XML_PATH_SENDING_RETURN_PATH_EMAIL    = 'system/smtp/return_path_email';
     const XML_PATH_DESIGN_EMAIL_LOGO            = 'design/email/logo';
@@ -140,11 +141,20 @@ class Mage_Core_Model_Email_Template extends Mage_Core_Model_Template
     /**
      * Retrieve mail object instance
      *
+     * Configure the factory helper at global/email/factory_helper using the format class::method.
+     * Default is Mage_Core_Helper_Mail::getMailer.
+     *
      * @return Zend_Mail
      */
     protected function _getMail()
     {
-        return new Zend_Mail('utf-8');
+        $factory = Mage::getConfig()->getNode(self::XML_PATH_MAIL_FACTORY);
+        $parts = explode('::', (string) $factory);
+        if (count($parts) != 2) {
+            throw new Exception(sprintf('Failed to get mail factory class and method.'));
+        }
+        $mailer = call_user_func(array(Mage::helper($parts[0]), $parts[2]));
+        return $mailer;
     }
 
     /**
